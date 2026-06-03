@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/carta.dart';
 import '../models/categoria.dart';
 import '../models/mood.dart';
+import '../models/reflexion.dart';
 
 class EstadisticasRacha {
   final int rachaActual;
@@ -61,6 +62,8 @@ class StorageService {
   static const _kProximoIdCarta = 'proximo_id_carta';
   static const _kRandomsHistorial = 'randoms_historial_v2';
   static const _kEspecialesHistorial = 'especiales_historial_v2';
+  static const _kReflexiones = 'reflexiones';
+  static const _kProximoIdReflexion = 'proximo_id_reflexion';
 
   static const int randomsMax = 10;
   static const int especialesMax = 3;
@@ -441,5 +444,138 @@ class StorageService {
       usados.map((t) => t.toIso8601String()).toList(),
     );
     return true;
+  }
+
+  // Reflexiones de 30 segundos
+  static Future<int> _siguienteIdReflexion() async {
+    final p = await _prefs;
+    final actual = p.getInt(_kProximoIdReflexion) ?? 1;
+    await p.setInt(_kProximoIdReflexion, actual + 1);
+    return actual;
+  }
+
+  static Future<List<Reflexion>> obtenerReflexiones() async {
+    final p = await _prefs;
+    final raw = p.getStringList(_kReflexiones) ?? [];
+    final lista = raw
+        .map((s) => Reflexion.fromJson(jsonDecode(s) as Map<String, dynamic>))
+        .toList();
+    lista.sort((a, b) => b.fechaHora.compareTo(a.fechaHora));
+    return lista;
+  }
+
+  static Future<Reflexion> guardarReflexion({
+    required String frase,
+    required String categoriaId,
+    String? moodId,
+    required String texto,
+  }) async {
+    final id = await _siguienteIdReflexion();
+    final r = Reflexion(
+      id: id,
+      fechaHora: DateTime.now(),
+      frase: frase,
+      categoriaId: categoriaId,
+      moodId: moodId,
+      texto: texto.trim(),
+    );
+    final p = await _prefs;
+    final lista = await obtenerReflexiones();
+    lista.insert(0, r);
+    await p.setStringList(
+      _kReflexiones,
+      lista.map((e) => jsonEncode(e.toJson())).toList(),
+    );
+    return r;
+  }
+
+  static Future<void> borrarReflexion(int id) async {
+    final p = await _prefs;
+    final lista = await obtenerReflexiones();
+    final filtrada = lista.where((r) => r.id != id).toList();
+    await p.setStringList(
+      _kReflexiones,
+      filtrada.map((e) => jsonEncode(e.toJson())).toList(),
+    );
+  }
+
+  static Future<EstadisticasReflexiones> obtenerEstadisticasReflexiones() async {
+    final lista = await obtenerReflexiones();
+    if (lista.isEmpty) {
+      return const EstadisticasReflexiones(
+        total: 0,
+        diasConsecutivos: 0,
+        moodMasFrecuente: null,
+        totalDiasUnicos: 0,
+      );
+    }
+    final diasSet = <String>{for (final r in lista) r.claveDia};
+
+    int diasConsecutivos = 0;
+    var cursor = DateTime.now();
+    while (true) {
+      final clave = claveDia(cursor);
+      if (diasSet.contains(clave)) {
+        diasConsecutivos++;
+        cursor = cursor.subtract(const Duration(days: 1));
+      } else {
+        if (diasConsecutivos == 0 &&
+            clave == claveDia(DateTime.now())) {
+          cursor = cursor.subtract(const Duration(days: 1));
+          continue;
+        }
+        break;
+      }
+    }
+
+    final conteoMood = <Mood, int>{};
+    for (final r in lista) {
+      final m = r.mood;
+      if (m != null) conteoMood[m] = (conteoMood[m] ?? 0) + 1;
+    }
+    Mood? moodMasFrecuente;
+    int max = 0;
+    conteoMood.forEach((mood, count) {
+      if (count > max) {
+        max = count;
+        moodMasFrecuente = mood;
+      }
+    });
+
+    return EstadisticasReflexiones(
+      total: lista.length,
+      diasConsecutivos: diasConsecutivos,
+      moodMasFrecuente: moodMasFrecuente,
+      totalDiasUnicos: diasSet.length,
+    );
+  }
+
+  static Future<Reflexion?> reflexionNostalgica() async {
+    final lista = await obtenerReflexiones();
+    if (lista.isEmpty) return null;
+    final ahora = DateTime.now();
+    Reflexion? candidata;
+    int mejorScore = -1;
+
+    int score(int dias) {
+      if (dias >= 365) return 1000 + (dias % 365);
+      if (dias >= 180) return 900;
+      if (dias >= 90) return 800;
+      if (dias >= 60) return 700;
+      if (dias >= 30) return 600;
+      if (dias >= 14) return 500;
+      if (dias >= 7) return 400;
+      return -1;
+    }
+
+    for (final r in lista) {
+      final dias = ahora.difference(r.fechaHora).inDays;
+      final s = score(dias);
+      if (s > mejorScore) {
+        mejorScore = s;
+        candidata = r;
+      }
+    }
+    return candidata;
   }
 }

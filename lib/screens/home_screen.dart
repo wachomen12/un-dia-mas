@@ -19,7 +19,9 @@ import '../widgets/story_card.dart';
 import 'ajustes_screen.dart';
 import 'diario_screen.dart';
 import 'leer_carta_screen.dart';
+import 'mi_camino_screen.dart';
 import 'racha_screen.dart';
+import 'reflexion_modal.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -300,6 +302,30 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
+  Future<void> _abrirReflexion() async {
+    if (_categoria == null) return;
+    final guardada = await abrirReflexionModal(
+      context,
+      frase: _frase,
+      categoria: _categoria!,
+    );
+    if (guardada && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Tu reflexión vive en Mi Camino 💭'),
+          duration: const Duration(seconds: 3),
+          action: SnackBarAction(
+            label: 'Ver',
+            textColor: Colors.white,
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const MiCaminoScreen()),
+            ),
+          ),
+        ),
+      );
+    }
+  }
+
   Future<void> _abrirDiario() async {
     await Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => const DiarioScreen()),
@@ -469,6 +495,8 @@ class _HomeScreenState extends State<HomeScreen>
                           _botonEcuatoriana(tonos),
                         ],
                       ),
+                      const SizedBox(height: 10),
+                      _promptReflexion(tonos),
                       const SizedBox(height: 10),
                       if (!_diarioHechoHoy) _promptDiario(tonos),
                       if (!_diarioHechoHoy) const SizedBox(height: 10),
@@ -648,6 +676,60 @@ class _HomeScreenState extends State<HomeScreen>
                 ),
               ),
               const Icon(Icons.chevron_right, color: Colors.white),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _promptReflexion(Tonos tonos) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: _abrirReflexion,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                AppColors.terracota.withValues(alpha: 0.12),
+                AppColors.naranjaSuave.withValues(alpha: 0.08),
+              ],
+            ),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color: AppColors.terracota.withValues(alpha: 0.25),
+            ),
+          ),
+          child: Row(
+            children: [
+              const Text('💭', style: TextStyle(fontSize: 22)),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '¿Qué significa esta frase para ti hoy?',
+                      style: GoogleFonts.nunito(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                        color: tonos.textoOscuro,
+                      ),
+                    ),
+                    Text(
+                      'Reflexión de 30 segundos · 150 caracteres',
+                      style: GoogleFonts.nunito(
+                        fontSize: 11,
+                        color: tonos.textoSuave,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(Icons.arrow_forward_ios, size: 14, color: tonos.textoSuave),
             ],
           ),
         ),

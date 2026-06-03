@@ -12,6 +12,7 @@ import 'cartas_screen.dart';
 import 'diario_screen.dart';
 import 'favoritas_screen.dart';
 import 'logros_screen.dart';
+import 'mi_camino_screen.dart';
 import 'mood_grafica_screen.dart';
 
 class AjustesScreen extends StatefulWidget {
@@ -459,6 +460,16 @@ class _AjustesScreenState extends State<AjustesScreen> {
               child: Column(
                 children: [
                   _itemNav(
+                    icono: Icons.timeline_outlined,
+                    titulo: 'Mi Camino',
+                    subtitulo: 'Tus reflexiones en el tiempo',
+                    tonos: tonos,
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const MiCaminoScreen()),
+                    ),
+                  ),
+                  const Divider(height: 1, indent: 16, endIndent: 16),
+                  _itemNav(
                     icono: Icons.mail_outline,
                     titulo: 'Cartas a mi yo futuro',
                     subtitulo: 'Escribe hoy, recibe mañana',
@@ -515,7 +526,7 @@ class _AjustesScreenState extends State<AjustesScreen> {
             const SizedBox(height: 32),
             Center(
               child: Text(
-                'Un Día Más • v5.0',
+                'Un Día Más • v6.0',
                 style: GoogleFonts.nunito(
                   fontSize: 12,
                   color: tonos.textoSuave,
