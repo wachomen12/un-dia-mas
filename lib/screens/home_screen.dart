@@ -42,6 +42,7 @@ class _HomeScreenState extends State<HomeScreen>
   List<Carta> _cartasPendientes = [];
   bool _cargando = true;
   int _randomsRestantes = StorageService.randomsMax;
+  int _especialesRestantes = StorageService.especialesMax;
 
   late final AnimationController _animCtrl;
   late final Animation<double> _fade;
@@ -89,6 +90,7 @@ class _HomeScreenState extends State<HomeScreen>
       diarioHoy = await StorageService.entradaDiarioHoy();
       cartas = await StorageService.cartasNoLeidasYDisponibles();
       _randomsRestantes = await StorageService.randomsRestantes();
+      _especialesRestantes = await StorageService.especialesRestantes();
 
       nuevos = Logros.nuevosDesbloqueados(stats.rachaActual, logrosAntes);
       for (final l in nuevos) {
@@ -192,23 +194,57 @@ class _HomeScreenState extends State<HomeScreen>
     });
   }
 
-  Future<void> _otraEcuatoriana() async {
-    final ok = await StorageService.registrarRandom();
+  Future<void> _otraEspecial() async {
+    final ok = await StorageService.registrarEspecial();
     if (!ok) {
       if (!mounted) return;
-      _mostrarLimiteRandom();
+      _mostrarLimiteEspecial();
       return;
     }
-    HapticFeedback.lightImpact();
+    HapticFeedback.mediumImpact();
     final nueva = Frases.aleatoriaEcuatoriana(excluir: _frase);
     final fav = await StorageService.esFavorita(nueva);
-    final restantes = await StorageService.randomsRestantes();
+    final restantes = await StorageService.especialesRestantes();
     if (!mounted) return;
     setState(() {
       _frase = nueva;
       _esFavorita = fav;
-      _randomsRestantes = restantes;
+      _especialesRestantes = restantes;
     });
+  }
+
+  Future<void> _mostrarLimiteEspecial() async {
+    HapticFeedback.mediumImpact();
+    final proximo = await StorageService.proximoEspecialDisponible();
+    String texto;
+    if (proximo == null) {
+      texto = 'Vuelve en un rato.';
+    } else {
+      final diferencia = proximo.difference(DateTime.now());
+      if (diferencia.inMinutes < 60) {
+        texto = 'En ${diferencia.inMinutes} minutos tienes otra.';
+      } else {
+        final horas = diferencia.inMinutes ~/ 60;
+        final mins = diferencia.inMinutes % 60;
+        texto = 'En ${horas}h ${mins}min tienes otra.';
+      }
+    }
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Sorpresas agotadas ✨'),
+        content: Text(
+          'Ya viste 3 sorpresas en las últimas 8 horas. Son frases especiales por algo.\n\n$texto',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Entendido'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _mostrarLimiteRandom() async {
@@ -480,12 +516,12 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   Widget _botonEcuatoriana(Tonos tonos) {
-    final agotado = _randomsRestantes <= 0;
+    final agotado = _especialesRestantes <= 0;
     return Material(
       color: Colors.transparent,
       child: InkWell(
         borderRadius: BorderRadius.circular(20),
-        onTap: agotado ? _mostrarLimiteRandom : _otraEcuatoriana,
+        onTap: agotado ? _mostrarLimiteEspecial : _otraEspecial,
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
           decoration: BoxDecoration(
@@ -502,10 +538,10 @@ class _HomeScreenState extends State<HomeScreen>
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text('🇪🇨', style: TextStyle(fontSize: 14)),
+              Text(agotado ? '🌿' : '✨', style: const TextStyle(fontSize: 14)),
               const SizedBox(width: 6),
               Text(
-                'Ecuatoriana',
+                agotado ? 'Espera' : 'Sorpresa · $_especialesRestantes',
                 style: GoogleFonts.nunito(
                   fontSize: 13,
                   fontWeight: FontWeight.w800,

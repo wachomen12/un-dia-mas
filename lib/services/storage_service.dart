@@ -60,8 +60,10 @@ class StorageService {
   static const _kCartas = 'cartas';
   static const _kProximoIdCarta = 'proximo_id_carta';
   static const _kRandomsHistorial = 'randoms_historial_v2';
+  static const _kEspecialesHistorial = 'especiales_historial_v2';
 
   static const int randomsMax = 10;
+  static const int especialesMax = 3;
   static const Duration randomsVentana = Duration(hours: 8);
 
   static Future<SharedPreferences> get _prefs => SharedPreferences.getInstance();
@@ -392,6 +394,50 @@ class StorageService {
     usados.add(DateTime.now());
     await p.setStringList(
       _kRandomsHistorial,
+      usados.map((t) => t.toIso8601String()).toList(),
+    );
+    return true;
+  }
+
+  // Contador del botón "Sorpresa" (más limitado)
+  static Future<List<DateTime>> _especialesRecientes() async {
+    final p = await _prefs;
+    final raw = p.getStringList(_kEspecialesHistorial) ?? [];
+    final ahora = DateTime.now();
+    final limite = ahora.subtract(randomsVentana);
+    final lista = <DateTime>[];
+    for (final s in raw) {
+      final t = DateTime.tryParse(s);
+      if (t != null && t.isAfter(limite)) lista.add(t);
+    }
+    if (lista.length != raw.length) {
+      await p.setStringList(
+        _kEspecialesHistorial,
+        lista.map((t) => t.toIso8601String()).toList(),
+      );
+    }
+    return lista;
+  }
+
+  static Future<int> especialesRestantes() async {
+    final usados = await _especialesRecientes();
+    return (especialesMax - usados.length).clamp(0, especialesMax);
+  }
+
+  static Future<DateTime?> proximoEspecialDisponible() async {
+    final usados = await _especialesRecientes();
+    if (usados.length < especialesMax) return null;
+    usados.sort();
+    return usados.first.add(randomsVentana);
+  }
+
+  static Future<bool> registrarEspecial() async {
+    final p = await _prefs;
+    final usados = await _especialesRecientes();
+    if (usados.length >= especialesMax) return false;
+    usados.add(DateTime.now());
+    await p.setStringList(
+      _kEspecialesHistorial,
       usados.map((t) => t.toIso8601String()).toList(),
     );
     return true;
