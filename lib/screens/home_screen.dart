@@ -7,6 +7,7 @@ import '../data/logros.dart';
 import '../data/plantitas.dart';
 import '../models/carta.dart';
 import '../models/categoria.dart';
+import '../models/intencion.dart';
 import '../models/mood.dart';
 import '../services/storage_service.dart' show EntradaDiario, EstadisticasRacha;
 import '../services/notification_service.dart';
@@ -22,6 +23,7 @@ import '../widgets/story_card.dart';
 import 'ajustes_screen.dart';
 import 'check_in_screen.dart';
 import 'diario_screen.dart';
+import 'intencion_modal.dart';
 import 'leer_carta_screen.dart';
 import 'mi_camino_screen.dart';
 import 'plantita_screen.dart';
@@ -53,6 +55,8 @@ class _HomeScreenState extends State<HomeScreen>
   Mood? _moodHoy;
   EtapaPlantita _etapaPlantita = Plantitas.etapas.first;
   EtapaPlantita? _nuevoNivelPlantita;
+  Intencion? _intencionHoy;
+  Intencion? _intencionPendiente;
 
   late final AnimationController _animCtrl;
   late final Animation<double> _fade;
@@ -135,6 +139,9 @@ class _HomeScreenState extends State<HomeScreen>
         _nuevoNivelPlantita = _etapaPlantita;
         await StorageService.guardarNivelPlantitaVisto(_etapaPlantita.nivel);
       }
+
+      _intencionHoy = await StorageService.intencionHoy();
+      _intencionPendiente = await StorageService.intencionPendienteDeRevisar();
     } catch (e) {
       debugPrint('Error cargando datos: $e');
       frase = Frases.delDia(catFrase, DateTime.now());
@@ -201,6 +208,36 @@ class _HomeScreenState extends State<HomeScreen>
     await Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => const PlantitaScreen()),
     );
+  }
+
+  Future<void> _definirIntencion() async {
+    final ok = await abrirIntencionModal(
+      context,
+      textoInicial: _intencionHoy?.texto,
+    );
+    if (ok && mounted) {
+      final nueva = await StorageService.intencionHoy();
+      if (mounted) setState(() => _intencionHoy = nueva);
+    }
+  }
+
+  Future<void> _responderIntencionPendiente(ResultadoIntencion r) async {
+    if (_intencionPendiente == null) return;
+    HapticFeedback.mediumImpact();
+    await StorageService.registrarResultadoIntencion(
+      _intencionPendiente!.fecha,
+      r,
+    );
+    if (!mounted) return;
+    setState(() => _intencionPendiente = null);
+    if (r == ResultadoIntencion.cumplida) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('¡Bien hecho! Tu plantita sonríe 🌱'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
   }
 
   String _saludo() {
@@ -531,6 +568,10 @@ class _HomeScreenState extends State<HomeScreen>
                         _bannerCarta(_cartasPendientes.first, tonos),
                         const SizedBox(height: 12),
                       ],
+                      if (_intencionPendiente != null) ...[
+                        _bannerRevisarIntencion(_intencionPendiente!, tonos),
+                        const SizedBox(height: 12),
+                      ],
                       Expanded(
                         child: RefreshIndicator(
                           color: AppColors.terracota,
@@ -589,6 +630,8 @@ class _HomeScreenState extends State<HomeScreen>
                           _botonEcuatoriana(tonos),
                         ],
                       ),
+                      const SizedBox(height: 10),
+                      _cardIntencion(tonos),
                       const SizedBox(height: 10),
                       _promptReflexion(tonos),
                       const SizedBox(height: 10),
@@ -710,6 +753,226 @@ class _HomeScreenState extends State<HomeScreen>
                   fontSize: 13,
                   fontWeight: FontWeight.w800,
                   color: agotado ? tonos.textoSuave : AppColors.terracota,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _cardIntencion(Tonos tonos) {
+    if (_intencionHoy == null) {
+      return Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(18),
+          onTap: _definirIntencion,
+          child: Container(
+            padding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: tonos.cremaTarjeta,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(
+                color: AppColors.terracota.withValues(alpha: 0.3),
+                style: BorderStyle.solid,
+              ),
+            ),
+            child: Row(
+              children: [
+                const Text('🎯', style: TextStyle(fontSize: 22)),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Definí tu intención del día',
+                        style: GoogleFonts.nunito(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w800,
+                          color: tonos.textoOscuro,
+                        ),
+                      ),
+                      Text(
+                        'Una sola cosa, foco real',
+                        style: GoogleFonts.nunito(
+                          fontSize: 12,
+                          color: tonos.textoSuave,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(Icons.chevron_right, color: tonos.textoSuave),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: _definirIntencion,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                AppColors.terracota.withValues(alpha: 0.15),
+                AppColors.naranjaSuave.withValues(alpha: 0.1),
+              ],
+            ),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color: AppColors.terracota.withValues(alpha: 0.35),
+            ),
+          ),
+          child: Row(
+            children: [
+              const Text('🎯', style: TextStyle(fontSize: 24)),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'TU MISIÓN DE HOY',
+                      style: GoogleFonts.nunito(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.terracota,
+                        letterSpacing: 0.8,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      _intencionHoy!.texto,
+                      style: GoogleFonts.playfairDisplay(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w700,
+                        color: tonos.textoOscuro,
+                        height: 1.3,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Icon(Icons.edit_outlined, size: 18, color: tonos.textoSuave),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _bannerRevisarIntencion(Intencion i, Tonos tonos) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 14, 12, 14),
+      decoration: BoxDecoration(
+        color: tonos.cremaTarjeta,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: AppColors.naranjaSuave.withValues(alpha: 0.5),
+          width: 1.5,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Text('💭', style: TextStyle(fontSize: 22)),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '¿Cumpliste tu intención?',
+                      style: GoogleFonts.nunito(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                        color: tonos.textoOscuro,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '"${i.texto}"',
+                      style: GoogleFonts.playfairDisplay(
+                        fontSize: 13,
+                        fontStyle: FontStyle.italic,
+                        color: tonos.textoSuave,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: _botonRespuesta(
+                  '✅', 'Sí', AppColors.terracota,
+                  () => _responderIntencionPendiente(
+                      ResultadoIntencion.cumplida),
+                ),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: _botonRespuesta(
+                  '🤝', 'Casi', AppColors.naranjaSuave,
+                  () => _responderIntencionPendiente(
+                      ResultadoIntencion.intentada),
+                ),
+              ),
+              const SizedBox(width: 6),
+              Expanded(
+                child: _botonRespuesta(
+                  '🌿', 'No', tonos.textoSuave,
+                  () => _responderIntencionPendiente(
+                      ResultadoIntencion.noCumplida),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _botonRespuesta(
+      String emoji, String texto, Color color, VoidCallback onTap) {
+    return Material(
+      color: color.withValues(alpha: 0.12),
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 10),
+          alignment: Alignment.center,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(emoji, style: const TextStyle(fontSize: 16)),
+              const SizedBox(width: 6),
+              Text(
+                texto,
+                style: GoogleFonts.nunito(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                  color: color,
                 ),
               ),
             ],

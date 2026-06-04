@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/carta.dart';
 import '../models/categoria.dart';
+import '../models/intencion.dart';
 import '../models/mood.dart';
 import '../models/reflexion.dart';
 
@@ -68,6 +69,7 @@ class StorageService {
   static const _kCheckinMood = 'checkin_ultimo_mood';
   static const _kPlantitaNombre = 'plantita_nombre';
   static const _kPlantitaUltimoNivel = 'plantita_ultimo_nivel';
+  static const _kIntenciones = 'intenciones';
 
   static const int randomsMax = 10;
   static const int especialesMax = 3;
@@ -593,6 +595,124 @@ class StorageService {
   static Future<void> guardarNivelPlantitaVisto(int nivel) async {
     final p = await _prefs;
     await p.setInt(_kPlantitaUltimoNivel, nivel);
+  }
+
+  // Intenciones del día
+  static Future<List<Intencion>> obtenerIntenciones() async {
+    final p = await _prefs;
+    final raw = p.getStringList(_kIntenciones) ?? [];
+    final lista = raw
+        .map((s) => Intencion.fromJson(jsonDecode(s) as Map<String, dynamic>))
+        .toList();
+    lista.sort((a, b) => b.fecha.compareTo(a.fecha));
+    return lista;
+  }
+
+  static Future<Intencion?> intencionHoy() async {
+    final hoy = claveDia(DateTime.now());
+    final lista = await obtenerIntenciones();
+    for (final i in lista) {
+      if (i.fecha == hoy) return i;
+    }
+    return null;
+  }
+
+  static Future<Intencion?> intencionPendienteDeRevisar() async {
+    final hoy = claveDia(DateTime.now());
+    final lista = await obtenerIntenciones();
+    for (final i in lista) {
+      if (i.fecha != hoy &&
+          i.resultado == ResultadoIntencion.pendiente) {
+        return i;
+      }
+    }
+    return null;
+  }
+
+  static Future<void> guardarIntencionHoy(String texto) async {
+    final hoy = claveDia(DateTime.now());
+    final lista = await obtenerIntenciones();
+    final filtrada = lista.where((i) => i.fecha != hoy).toList();
+    filtrada.insert(
+      0,
+      Intencion(fecha: hoy, texto: texto.trim()),
+    );
+    await _persistirIntenciones(filtrada);
+  }
+
+  static Future<void> registrarResultadoIntencion(
+    String fecha,
+    ResultadoIntencion resultado,
+  ) async {
+    final lista = await obtenerIntenciones();
+    final nueva = lista
+        .map((i) => i.fecha == fecha
+            ? i.copyWith(
+                resultado: resultado,
+                fechaRespuesta: DateTime.now(),
+              )
+            : i)
+        .toList();
+    await _persistirIntenciones(nueva);
+  }
+
+  static Future<void> borrarIntencion(String fecha) async {
+    final lista = await obtenerIntenciones();
+    final filtrada = lista.where((i) => i.fecha != fecha).toList();
+    await _persistirIntenciones(filtrada);
+  }
+
+  static Future<EstadisticasIntenciones> obtenerStatsIntenciones() async {
+    final lista = await obtenerIntenciones();
+    int total = lista.length;
+    int cumplidas = 0;
+    int intentadas = 0;
+    int noCumplidas = 0;
+    int racha = 0;
+
+    for (final i in lista) {
+      switch (i.resultado) {
+        case ResultadoIntencion.cumplida:
+          cumplidas++;
+          break;
+        case ResultadoIntencion.intentada:
+          intentadas++;
+          break;
+        case ResultadoIntencion.noCumplida:
+          noCumplidas++;
+          break;
+        case ResultadoIntencion.pendiente:
+          break;
+      }
+    }
+
+    final ordenadas = [...lista];
+    ordenadas.sort((a, b) => b.fecha.compareTo(a.fecha));
+    for (final i in ordenadas) {
+      if (i.resultado == ResultadoIntencion.cumplida) {
+        racha++;
+      } else if (i.resultado == ResultadoIntencion.pendiente) {
+        continue;
+      } else {
+        break;
+      }
+    }
+
+    return EstadisticasIntenciones(
+      total: total,
+      cumplidas: cumplidas,
+      intentadas: intentadas,
+      noCumplidas: noCumplidas,
+      rachaIntencionesCumplidas: racha,
+    );
+  }
+
+  static Future<void> _persistirIntenciones(List<Intencion> lista) async {
+    final p = await _prefs;
+    await p.setStringList(
+      _kIntenciones,
+      lista.map((e) => jsonEncode(e.toJson())).toList(),
+    );
   }
 
   static Future<Reflexion?> reflexionNostalgica() async {

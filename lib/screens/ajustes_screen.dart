@@ -12,6 +12,7 @@ import 'cartas_screen.dart';
 import 'diario_screen.dart';
 import 'favoritas_screen.dart';
 import 'logros_screen.dart';
+import 'intenciones_screen.dart';
 import 'mi_camino_screen.dart';
 import 'mood_grafica_screen.dart';
 import 'plantita_screen.dart';
@@ -460,6 +461,17 @@ class _AjustesScreenState extends State<AjustesScreen> {
               tonos,
               child: Column(
                 children: [
+                  _itemNav(
+                    icono: Icons.flag_outlined,
+                    titulo: 'Mis intenciones',
+                    subtitulo: 'Tus misiones del día',
+                    tonos: tonos,
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                          builder: (_) => const IntencionesScreen()),
+                    ),
+                  ),
+                  const Divider(height: 1, indent: 16, endIndent: 16),
                   _itemNav(
                     icono: Icons.eco_outlined,
                     titulo: 'Mi plantita',
