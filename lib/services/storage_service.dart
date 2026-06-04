@@ -64,6 +64,8 @@ class StorageService {
   static const _kEspecialesHistorial = 'especiales_historial_v2';
   static const _kReflexiones = 'reflexiones';
   static const _kProximoIdReflexion = 'proximo_id_reflexion';
+  static const _kCheckinDia = 'checkin_ultimo_dia';
+  static const _kCheckinMood = 'checkin_ultimo_mood';
 
   static const int randomsMax = 10;
   static const int especialesMax = 3;
@@ -548,6 +550,26 @@ class StorageService {
       moodMasFrecuente: moodMasFrecuente,
       totalDiasUnicos: diasSet.length,
     );
+  }
+
+  // Check-in matutino
+  static Future<bool> checkinHechoHoy() async {
+    final p = await _prefs;
+    final ultimo = p.getString(_kCheckinDia);
+    return ultimo == claveDia(DateTime.now());
+  }
+
+  static Future<Mood?> obtenerCheckinHoy() async {
+    final p = await _prefs;
+    final ultimo = p.getString(_kCheckinDia);
+    if (ultimo != claveDia(DateTime.now())) return null;
+    return Mood.fromId(p.getString(_kCheckinMood));
+  }
+
+  static Future<void> guardarCheckin(Mood mood) async {
+    final p = await _prefs;
+    await p.setString(_kCheckinDia, claveDia(DateTime.now()));
+    await p.setString(_kCheckinMood, mood.id);
   }
 
   static Future<Reflexion?> reflexionNostalgica() async {

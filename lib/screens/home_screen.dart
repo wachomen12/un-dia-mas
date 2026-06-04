@@ -6,6 +6,7 @@ import '../data/frases.dart';
 import '../data/logros.dart';
 import '../models/carta.dart';
 import '../models/categoria.dart';
+import '../models/mood.dart';
 import '../services/storage_service.dart' show EntradaDiario, EstadisticasRacha;
 import '../services/notification_service.dart';
 import '../services/share_service.dart';
@@ -17,6 +18,7 @@ import '../widgets/popup_logro.dart';
 import '../widgets/racha_compacta.dart';
 import '../widgets/story_card.dart';
 import 'ajustes_screen.dart';
+import 'check_in_screen.dart';
 import 'diario_screen.dart';
 import 'leer_carta_screen.dart';
 import 'mi_camino_screen.dart';
@@ -45,6 +47,7 @@ class _HomeScreenState extends State<HomeScreen>
   bool _cargando = true;
   int _randomsRestantes = StorageService.randomsMax;
   int _especialesRestantes = StorageService.especialesMax;
+  Mood? _moodHoy;
 
   late final AnimationController _animCtrl;
   late final Animation<double> _fade;
@@ -74,6 +77,7 @@ class _HomeScreenState extends State<HomeScreen>
   Future<void> _cargar() async {
     String nombre = '';
     Categoria cat = Categoria.momentoDificil;
+    Categoria catFrase = Categoria.momentoDificil;
     Set<String> logrosAntes = {};
     EstadisticasRacha? stats;
     String frase = '';
@@ -81,13 +85,34 @@ class _HomeScreenState extends State<HomeScreen>
     EntradaDiario? diarioHoy;
     List<Carta> cartas = [];
     List<Logro> nuevos = [];
+    Mood? moodHoy;
 
     try {
       nombre = await StorageService.obtenerNombre();
       cat = await StorageService.obtenerCategoria();
+      moodHoy = await StorageService.obtenerCheckinHoy();
+    } catch (e) {
+      debugPrint('Error pre-checkin: $e');
+    }
+
+    if (moodHoy == null && mounted) {
+      try {
+        final picked = await mostrarCheckIn(context, nombre: nombre);
+        if (picked != null) {
+          await StorageService.guardarCheckin(picked);
+          moodHoy = picked;
+        }
+      } catch (e) {
+        debugPrint('Error en check-in: $e');
+      }
+    }
+
+    catFrase = moodHoy?.categoriaSugerida(cat) ?? cat;
+
+    try {
       logrosAntes = await StorageService.obtenerLogros();
       stats = await StorageService.registrarAperturaHoy();
-      frase = Frases.delDia(cat, DateTime.now());
+      frase = Frases.delDia(catFrase, DateTime.now());
       fav = await StorageService.esFavorita(frase);
       diarioHoy = await StorageService.entradaDiarioHoy();
       cartas = await StorageService.cartasNoLeidasYDisponibles();
@@ -100,7 +125,7 @@ class _HomeScreenState extends State<HomeScreen>
       }
     } catch (e) {
       debugPrint('Error cargando datos: $e');
-      frase = Frases.delDia(cat, DateTime.now());
+      frase = Frases.delDia(catFrase, DateTime.now());
     }
 
     try {
@@ -120,12 +145,13 @@ class _HomeScreenState extends State<HomeScreen>
     if (!mounted) return;
     setState(() {
       _nombre = nombre;
-      _categoria = cat;
+      _categoria = catFrase;
       _frase = frase;
       _racha = stats?.rachaActual ?? 0;
       _esFavorita = fav;
       _diarioHechoHoy = diarioHoy != null;
       _cartasPendientes = cartas;
+      _moodHoy = moodHoy;
       _cargando = false;
     });
     _animCtrl.forward();
@@ -148,8 +174,9 @@ class _HomeScreenState extends State<HomeScreen>
     } else {
       base = 'Buenas noches';
     }
-    if (_nombre.isNotEmpty) return '$base, $_nombre';
-    return base;
+    final emoji = _moodHoy != null ? ' ${_moodHoy!.emoji}' : '';
+    if (_nombre.isNotEmpty) return '$base, $_nombre$emoji';
+    return '$base$emoji';
   }
 
   Future<void> _compartirStory() async {
