@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../data/frases.dart';
 import '../data/logros.dart';
+import '../data/plantitas.dart';
 import '../models/carta.dart';
 import '../models/categoria.dart';
 import '../models/mood.dart';
@@ -15,6 +16,7 @@ import '../services/widget_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/frase_card.dart';
 import '../widgets/popup_logro.dart';
+import '../widgets/popup_nivel_plantita.dart';
 import '../widgets/racha_compacta.dart';
 import '../widgets/story_card.dart';
 import 'ajustes_screen.dart';
@@ -22,6 +24,7 @@ import 'check_in_screen.dart';
 import 'diario_screen.dart';
 import 'leer_carta_screen.dart';
 import 'mi_camino_screen.dart';
+import 'plantita_screen.dart';
 import 'racha_screen.dart';
 import 'reflexion_modal.dart';
 
@@ -48,6 +51,8 @@ class _HomeScreenState extends State<HomeScreen>
   int _randomsRestantes = StorageService.randomsMax;
   int _especialesRestantes = StorageService.especialesMax;
   Mood? _moodHoy;
+  EtapaPlantita _etapaPlantita = Plantitas.etapas.first;
+  EtapaPlantita? _nuevoNivelPlantita;
 
   late final AnimationController _animCtrl;
   late final Animation<double> _fade;
@@ -123,6 +128,13 @@ class _HomeScreenState extends State<HomeScreen>
       for (final l in nuevos) {
         await StorageService.guardarLogro(l.id);
       }
+
+      _etapaPlantita = Plantitas.actual(stats.totalDias);
+      final nivelVisto = await StorageService.obtenerNivelPlantitaVisto();
+      if (_etapaPlantita.nivel > nivelVisto) {
+        _nuevoNivelPlantita = _etapaPlantita;
+        await StorageService.guardarNivelPlantitaVisto(_etapaPlantita.nivel);
+      }
     } catch (e) {
       debugPrint('Error cargando datos: $e');
       frase = Frases.delDia(catFrase, DateTime.now());
@@ -160,6 +172,35 @@ class _HomeScreenState extends State<HomeScreen>
       if (!mounted) return;
       await mostrarPopupLogro(context, l);
     }
+
+    if (_nuevoNivelPlantita != null && mounted) {
+      await mostrarPopupNivelPlantita(context, _nuevoNivelPlantita!);
+      _nuevoNivelPlantita = null;
+    }
+  }
+
+  String? _mensajeDiaSemana() {
+    switch (DateTime.now().weekday) {
+      case DateTime.monday:
+        return 'Nueva semana ✨';
+      case DateTime.wednesday:
+        return 'Mitad de semana 🌿';
+      case DateTime.friday:
+        return 'Llegaste a viernes 🌅';
+      case DateTime.saturday:
+        return 'Sábado, despacito';
+      case DateTime.sunday:
+        return 'Domingo de pausa 💛';
+      default:
+        return null;
+    }
+  }
+
+  Future<void> _abrirPlantita() async {
+    HapticFeedback.lightImpact();
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const PlantitaScreen()),
+    );
   }
 
   String _saludo() {
@@ -417,6 +458,14 @@ class _HomeScreenState extends State<HomeScreen>
         ),
         actions: [
           IconButton(
+            tooltip: 'Mi plantita',
+            onPressed: _abrirPlantita,
+            icon: Text(
+              _etapaPlantita.emoji,
+              style: const TextStyle(fontSize: 22),
+            ),
+          ),
+          IconButton(
             icon: const Icon(Icons.settings_outlined),
             onPressed: _abrirAjustes,
             tooltip: 'Ajustes',
@@ -446,14 +495,32 @@ class _HomeScreenState extends State<HomeScreen>
                       Row(
                         children: [
                           Expanded(
-                            child: Text(
-                              _saludo(),
-                              style: GoogleFonts.nunito(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w700,
-                                color: tonos.textoSuave,
-                              ),
-                              overflow: TextOverflow.ellipsis,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  _saludo(),
+                                  style: GoogleFonts.nunito(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w700,
+                                    color: tonos.textoSuave,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                if (_mensajeDiaSemana() != null)
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 2),
+                                    child: Text(
+                                      _mensajeDiaSemana()!,
+                                      style: GoogleFonts.nunito(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w700,
+                                        color: AppColors.terracota,
+                                        letterSpacing: 0.2,
+                                      ),
+                                    ),
+                                  ),
+                              ],
                             ),
                           ),
                           RachaCompacta(racha: _racha, onTap: _abrirRacha),

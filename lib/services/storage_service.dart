@@ -66,6 +66,8 @@ class StorageService {
   static const _kProximoIdReflexion = 'proximo_id_reflexion';
   static const _kCheckinDia = 'checkin_ultimo_dia';
   static const _kCheckinMood = 'checkin_ultimo_mood';
+  static const _kPlantitaNombre = 'plantita_nombre';
+  static const _kPlantitaUltimoNivel = 'plantita_ultimo_nivel';
 
   static const int randomsMax = 10;
   static const int especialesMax = 3;
@@ -570,6 +572,27 @@ class StorageService {
     final p = await _prefs;
     await p.setString(_kCheckinDia, claveDia(DateTime.now()));
     await p.setString(_kCheckinMood, mood.id);
+  }
+
+  // Plantita
+  static Future<String> obtenerNombrePlantita() async {
+    final p = await _prefs;
+    return p.getString(_kPlantitaNombre) ?? 'Mi plantita';
+  }
+
+  static Future<void> guardarNombrePlantita(String nombre) async {
+    final p = await _prefs;
+    await p.setString(_kPlantitaNombre, nombre.trim());
+  }
+
+  static Future<int> obtenerNivelPlantitaVisto() async {
+    final p = await _prefs;
+    return p.getInt(_kPlantitaUltimoNivel) ?? -1;
+  }
+
+  static Future<void> guardarNivelPlantitaVisto(int nivel) async {
+    final p = await _prefs;
+    await p.setInt(_kPlantitaUltimoNivel, nivel);
   }
 
   static Future<Reflexion?> reflexionNostalgica() async {

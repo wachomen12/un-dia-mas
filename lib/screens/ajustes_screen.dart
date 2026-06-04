@@ -14,6 +14,7 @@ import 'favoritas_screen.dart';
 import 'logros_screen.dart';
 import 'mi_camino_screen.dart';
 import 'mood_grafica_screen.dart';
+import 'plantita_screen.dart';
 
 class AjustesScreen extends StatefulWidget {
   const AjustesScreen({super.key});
@@ -459,6 +460,16 @@ class _AjustesScreenState extends State<AjustesScreen> {
               tonos,
               child: Column(
                 children: [
+                  _itemNav(
+                    icono: Icons.eco_outlined,
+                    titulo: 'Mi plantita',
+                    subtitulo: 'Cómo va creciendo contigo',
+                    tonos: tonos,
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const PlantitaScreen()),
+                    ),
+                  ),
+                  const Divider(height: 1, indent: 16, endIndent: 16),
                   _itemNav(
                     icono: Icons.timeline_outlined,
                     titulo: 'Mi Camino',
